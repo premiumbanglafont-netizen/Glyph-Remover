@@ -1,0 +1,9 @@
+PBFF Glyph Remover
+Copyright/branding: PBFF
+
+Third-party runtime components:
+- Pyodide
+- fontTools
+- opentype.js
+
+See their respective licenses and project pages for their terms.
