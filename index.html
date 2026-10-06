@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PBFF Glyph Remover</title>
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo"><img src="logo.png" alt="PBFF" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='grid'"><span id="logoFallback">P</span></div>
+      <div><h1>PBFF Glyph Remover</h1><p>Bangla Font &amp; Font Tools</p></div>
+    </div>
+    <div class="brand-tag">PBFF</div>
+  </header>
+
+  <main>
+    <section class="upload" id="dropZone">
+      <div class="upload-icon">↑</div>
+      <h2>Upload TTF / OTF Font</h2>
+      <p>Drag &amp; drop your font here, or choose a file.</p>
+      <button id="chooseBtn" class="primary">Choose Font</button>
+      <input id="fileInput" type="file" accept=".ttf,.otf">
+      <div id="fileInfo" class="muted">Maximum 30 MB</div>
+    </section>
+
+    <section id="editor" class="editor hidden">
+      <div class="font-head">
+        <div>
+          <h2 id="fontName">Font</h2>
+          <p id="fontMeta"></p>
+        </div>
+        <div id="engineStatus" class="engine">Preparing font engine…</div>
+      </div>
+
+      <div class="notice">
+        <b>Safe shaping mode:</b> GSUB/GPOS/GDEF-aware subsetting is used. Some glyphs may be retained as layout dependencies when removing them would otherwise break shaping. This is intentional for Bangla conjuncts and other complex scripts.
+      </div>
+
+      <div class="toolbar">
+        <div id="status">0 glyphs</div>
+        <input id="search" type="search" placeholder="Search glyph ID / Unicode">
+        <button id="resetBtn" class="secondary">Reset</button>
+        <button id="downloadBtn" class="primary" disabled>Download Font</button>
+      </div>
+
+      <div id="progress" class="progress hidden"><span></span></div>
+      <div id="glyphGrid" class="glyph-grid"></div>
+    </section>
+  </main>
+
+  <footer>PBFF Glyph Remover · Runs locally in your browser</footer>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
