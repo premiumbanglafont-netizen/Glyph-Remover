@@ -1,32 +1,31 @@
 # PBFF Glyph Remover
 
-GitHub Pages-ready browser font glyph remover.
+GitHub Pages-ready glyph remover for TTF and OTF fonts.
 
 ## Files
 
-- `index.html`
-- `app.js`
-- `style.css`
-- `logo.png` ← put your own logo here
+- index.html
+- app.js
+- style.css
+- logo.png
+- README.md
 
-## Upload to GitHub
+Replace `logo.png` with your own logo. Keep the filename exactly `logo.png`.
 
-1. Create/open your repository.
-2. Upload all files in this folder.
-3. Put your logo beside `index.html` and name it exactly `logo.png`.
-4. Enable GitHub Pages from repository Settings → Pages.
-5. Open the published Pages URL.
+## Important changes
 
-## Processing
+1. Pyodide/fontTools is NOT loaded when the page opens.
+2. Upload and glyph preview therefore start much faster.
+3. The file picker is opened only from the Choose Font button.
+4. Logo is circular.
+5. Glyph preview uses high-resolution canvas and the real glyph outline bounding box.
+6. Each glyph is mathematically centered inside the preview box.
+7. Clicking a glyph marks/unmarks it for removal.
+8. Glyph #0 (.notdef) cannot be removed.
+9. Download processing uses fontTools subsetter with OpenType layout features enabled.
+10. Downloaded filename starts with `PBFF_` and ends with `_Removed`.
 
-The app uses Pyodide in the browser and Python fontTools for font subsetting. `opentype.js` is used only for glyph inspection/preview. The output name is:
+Example:
+`PBFF_MyFont_Removed.ttf`
 
-`PBFF_OriginalFontName_Removed.ttf`
-
-or
-
-`PBFF_OriginalFontName_Removed.otf`
-
-The subsetter keeps OpenType layout features enabled. For complex scripts such as Bangla, layout-dependent glyphs may be retained when required for shaping. This is safer than rebuilding a font from a bare glyph list.
-
-The app needs an internet connection on first load because Pyodide, fontTools, and opentype.js are loaded from CDNs. No font file is uploaded to your server by this app.
+The first Download operation needs an internet connection because Pyodide and fontTools are loaded in the browser.
