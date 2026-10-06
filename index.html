@@ -1,60 +1,13 @@
-<!doctype html>
-<html lang="bn">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>PBFF Glyph Remover</title>
-<link rel="icon" href="logo.png">
-<link rel="stylesheet" href="style.css">
+<!doctype html><html lang="bn"><head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PBFF Glyph Remover</title><link rel="icon" href="logo.png"><link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
-</head>
-<body>
-<div class="app">
-<header class="topbar">
-  <div class="brand">
-    <div class="logo"><img src="logo.png" alt="PBFF" onerror="this.style.display='none';document.getElementById('logoFallback').style.display='grid'"><span id="logoFallback">P</span></div>
-    <div><h1>PBFF Glyph Remover</h1><p>Bangla Font &amp; Font Tools</p></div>
-  </div>
-  <div class="tag">PBFF</div>
-</header>
-
-<main>
-<section class="upload" id="dropZone">
-  <div class="uploadIcon">↑</div>
-  <h2>Upload TTF / OTF Font</h2>
-  <p>Choose a font or drag it here</p>
-  <input id="fileInput" type="file" accept=".ttf,.otf,font/ttf,font/otf">
-  <button id="chooseBtn" type="button" class="primary">Choose Font</button>
-  <div id="fileInfo" class="muted">Maximum 30 MB</div>
-</section>
-
-<section id="editor" class="hidden">
-  <div class="fontHead">
-    <div>
-      <h2 id="fontName">Font</h2>
-      <p id="fontMeta"></p>
-    </div>
-    <div id="engineStatus" class="engine idle">Ready</div>
-  </div>
-
-  <div class="notice">
-    <b>Bangla-safe:</b> Download-এর সময় OpenType GSUB/GPOS/GDEF layout data ধরে রেখে fontTools subset করা হবে।
-  </div>
-
-  <div class="toolbar">
-    <div id="status">0 glyphs</div>
-    <input id="search" type="search" placeholder="Search Glyph ID / Unicode">
-    <button id="resetBtn" type="button" class="secondary">Reset</button>
-    <button id="downloadBtn" type="button" class="primary" disabled>Download Font</button>
-  </div>
-
-  <div id="progressWrap" class="progress hidden"><span id="progressBar"></span></div>
-  <div id="glyphGrid" class="glyphGrid"></div>
-</section>
-</main>
-
-<footer>PBFF Glyph Remover · Runs locally in your browser</footer>
-</div>
-<script src="app.js"></script>
-</body>
-</html>
+<script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
+</head><body><div class="app">
+<header><div class="brand"><div class="logo"><img src="logo.png" alt="PBFF"></div><div><b>PBFF Glyph Remover</b><small>Bangla Font & Font Tools</small></div></div><span>PBFF</span></header>
+<main><section class="upload" id="dropZone"><div class="up">↑</div><h2>Upload TTF / OTF Font</h2><p>Choose a font or drag it here</p><input id="fileInput" type="file" accept=".ttf,.otf"><button id="chooseBtn">Choose Font</button><small id="fileInfo">Maximum 30 MB</small></section>
+<section id="editor" class="hide"><div class="fh"><div><h2 id="fontName">Font</h2><small id="fontMeta"></small></div><em id="engine">Ready</em></div>
+<div class="note"><b>Bangla-safe:</b> Download-এর সময় GSUB/GPOS/GDEF layout data ধরে রেখে fontTools subset করা হবে।</div>
+<div class="bar"><strong id="status">0 glyphs</strong><input id="search" placeholder="Search Glyph ID / Unicode"><button id="reset">Reset</button><button id="download" disabled>Download Font</button></div>
+<div id="prog" class="hide"><i id="pb"></i></div><div id="grid"></div></section></main>
+<footer>PBFF Glyph Remover · Runs locally in your browser</footer></div><script src="app.js"></script></body></html>
