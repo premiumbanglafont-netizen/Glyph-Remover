@@ -71,11 +71,32 @@ function render(){
     if(q && !hay.includes(q))continue;
     const card=document.createElement("div");
     card.className="glyph-card"+(removed.has(r.gid)?" selected":"");
-    const c=document.createElement("canvas");c.width=64;c.height=64;
+    const c=document.createElement("canvas");
+    c.width=86;
+    c.height=86;
     try{
-      const p=r.g.getPath(8,48,38);
-      p.fill="#1c1e21";p.draw(c.getContext("2d"));
-    }catch{}
+      const ctx=c.getContext("2d");
+      ctx.clearRect(0,0,c.width,c.height);
+
+      const box=r.g.getBoundingBox();
+      const bw=Math.max(1, box.x2-box.x1);
+      const bh=Math.max(1, box.y2-box.y1);
+      const pad=9;
+
+      // Dynamically fit each glyph to the preview box.
+      const sx=(c.width-pad*2)/bw;
+      const sy=(c.height-pad*2)/bh;
+      const scale=Math.min(sx,sy);
+      const fontSize=font.unitsPerEm*scale;
+      const x=pad-(box.x1*scale);
+      const y=(c.height-pad)+(box.y1*scale);
+
+      const path=r.g.getPath(x,y,fontSize);
+      path.fill="#111111";
+      path.draw(ctx);
+    }catch(err){
+      console.warn("Glyph preview failed:",r.gid,err);
+    }
     const gid=document.createElement("span");gid.className="gid";gid.textContent="#"+r.gid;
     const u=document.createElement("span");u.className="uni";u.textContent=uni?"U+"+uni:"—";
     card.append(c,gid,u);
