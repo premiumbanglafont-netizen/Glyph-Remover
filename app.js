@@ -1,171 +1,434 @@
 const $=id=>document.getElementById(id);
-let file=null,font=null,removed=new Set(),pyodide=null,ready=false,records=[];
 
-const drop=$("dropZone"), input=$("fileInput"), grid=$("glyphGrid");
-$("chooseBtn").onclick=e=>{e.stopPropagation();input.click()};
-drop.onclick=()=>input.click();
-["dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("drag")}));
-["dragleave"].forEach(ev=>drop.addEventListener(ev,()=>drop.classList.remove("drag")));
-drop.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("drag");if(e.dataTransfer.files[0])loadFile(e.dataTransfer.files[0])});
-input.onchange=()=>{if(input.files[0])loadFile(input.files[0])};
-$("resetBtn").onclick=()=>{removed.clear();render()};
-$("search").oninput=()=>render();
+let file=null;
+let font=null;
+let records=[];
+let removed=new Set();
+let pyodide=null;
+let enginePromise=null;
+let engineReady=false;
+
+const input=$("fileInput");
+const choose=$("chooseBtn");
+const drop=$("dropZone");
+const grid=$("glyphGrid");
+
+choose.addEventListener("click",e=>{
+  e.preventDefault();
+  e.stopPropagation();
+  input.click();
+});
+
+input.addEventListener("change",()=>{
+  const f=input.files && input.files[0];
+  if(f) loadFile(f);
+  input.value="";
+});
+
+drop.addEventListener("dragover",e=>{
+  e.preventDefault();
+  drop.classList.add("drag");
+});
+
+drop.addEventListener("dragleave",()=>drop.classList.remove("drag"));
+
+drop.addEventListener("drop",e=>{
+  e.preventDefault();
+  drop.classList.remove("drag");
+  const f=e.dataTransfer.files && e.dataTransfer.files[0];
+  if(f) loadFile(f);
+});
+
+$("resetBtn").onclick=()=>{
+  removed.clear();
+  render();
+};
+
+$("search").oninput=render;
 $("downloadBtn").onclick=downloadFont;
 
-async function initEngine(){
-  $("engineStatus").textContent="Loading font engine…";
-  try{
-    pyodide=await loadPyodide({indexURL:"https://cdn.jsdelivr.net/pyodide/v0.29.3/full/"});
-    $("engineStatus").textContent="Installing fontTools…";
-    await pyodide.loadPackage("micropip");
-    await pyodide.runPythonAsync(`
-import micropip
-await micropip.install("fonttools")
-`);
-    await pyodide.runPythonAsync(`
-from fontTools.ttLib import TTFont
-from fontTools import subset
-`);
-    ready=true;
-    $("engineStatus").textContent="Font engine ready";
-    $("engineStatus").className="engine ready";
-    if(file) $("downloadBtn").disabled=false;
-  }catch(e){
-    console.error(e);
-    $("engineStatus").textContent="Engine failed to load";
-    $("engineStatus").className="engine error";
-  }
-}
-initEngine();
+function loadFile(f){
+  const ext=(f.name.split(".").pop()||"").toLowerCase();
 
-async function loadFile(f){
-  const ext=f.name.split(".").pop().toLowerCase();
-  if(!["ttf","otf"].includes(ext)){alert("শুধু TTF বা OTF ফাইল দিন।");return}
-  if(f.size>30*1024*1024){alert("ফাইল 30MB-এর বেশি হতে পারবে না।");return}
-  file=f; removed.clear(); $("fileInfo").textContent=`Selected: ${f.name} · ${(f.size/1048576).toFixed(2)} MB`;
-  try{
-    const buf=await f.arrayBuffer();
-    font=opentype.parse(buf);
-    $("editor").classList.remove("hidden");
-    $("fontName").textContent=font.getEnglishName("fullName")||font.getEnglishName("fontFamily")||f.name;
-    $("fontMeta").textContent=`${font.glyphs.length} glyphs · ${ext.toUpperCase()}`;
-    records=[];
-    for(let i=0;i<font.glyphs.length;i++){
-      const g=font.glyphs.get(i);
-      let unicodes=[];
-      try{if(g.unicodes) unicodes=g.unicodes; else if(g.unicode!=null) unicodes=[g.unicode]}catch{}
-      records.push({gid:i,g,unicodes});
+  if(!["ttf","otf"].includes(ext)){
+    alert("শুধু TTF অথবা OTF font upload করুন।");
+    return;
+  }
+
+  if(f.size>30*1024*1024){
+    alert("Font file 30MB-এর বেশি হতে পারবে না।");
+    return;
+  }
+
+  file=f;
+  removed.clear();
+  $("fileInfo").textContent=`Selected: ${f.name} · ${(f.size/1048576).toFixed(2)} MB`;
+  $("downloadBtn").disabled=true;
+
+  const reader=new FileReader();
+
+  reader.onload=ev=>{
+    try{
+      font=opentype.parse(ev.target.result);
+
+      records=[];
+      for(let i=0;i<font.glyphs.length;i++){
+        const g=font.glyphs.get(i);
+        let us=[];
+        try{
+          us=Array.isArray(g.unicodes)
+            ?g.unicodes
+            :(g.unicode!=null?[g.unicode]:[]);
+        }catch(_){}
+
+        records.push({gid:i,g,unicodes:us});
+      }
+
+      $("editor").classList.remove("hidden");
+      $("fontName").textContent=
+        font.getEnglishName("fullName") ||
+        font.getEnglishName("fontFamily") ||
+        f.name;
+
+      $("fontMeta").textContent=
+        `${font.glyphs.length} glyphs · ${ext.toUpperCase()}`;
+
+      $("engineStatus").textContent="Ready";
+      $("engineStatus").className="engine idle";
+
+      render();
+
+    }catch(err){
+      console.error(err);
+      alert("Font parse করা যায়নি:\n"+err.message);
     }
-    render();
-    if(ready)$("downloadBtn").disabled=false;
-  }catch(e){console.error(e);alert("Font parse করা যায়নি: "+e.message)}
+  };
+
+  reader.onerror=()=>{
+    alert("Font file পড়তে সমস্যা হয়েছে।");
+  };
+
+  reader.readAsArrayBuffer(f);
 }
 
 function render(){
   grid.innerHTML="";
+
   const q=$("search").value.trim().toLowerCase();
   let shown=0;
+
   for(const r of records){
-    const uni=r.unicodes.map(x=>x.toString(16).toUpperCase()).join(" ");
-    const hay=(`${r.gid} ${uni} ${r.g.name||""}`).toLowerCase();
-    if(q && !hay.includes(q))continue;
+
+    const uni=r.unicodes
+      .map(x=>x.toString(16).toUpperCase())
+      .join(" ");
+
+    const hay=
+      `${r.gid} ${uni} ${r.g.name||""}`.toLowerCase();
+
+    if(q && !hay.includes(q)) continue;
+
     const card=document.createElement("div");
-    card.className="glyph-card"+(removed.has(r.gid)?" selected":"");
-    const c=document.createElement("canvas");
-    c.width=86;
-    c.height=86;
-    try{
-      const ctx=c.getContext("2d");
-      ctx.clearRect(0,0,c.width,c.height);
+    card.className="glyphCard"+
+      (removed.has(r.gid)?" selected":"");
 
-      const box=r.g.getBoundingBox();
-      const bw=Math.max(1, box.x2-box.x1);
-      const bh=Math.max(1, box.y2-box.y1);
-      const pad=9;
+    const canvas=document.createElement("canvas");
+    canvas.className="glyphCanvas";
+    canvas.width=172;
+    canvas.height=172;
 
-      // Dynamically fit each glyph to the preview box.
-      const sx=(c.width-pad*2)/bw;
-      const sy=(c.height-pad*2)/bh;
-      const scale=Math.min(sx,sy);
-      const fontSize=font.unitsPerEm*scale;
-      const x=pad-(box.x1*scale);
-      const y=(c.height-pad)+(box.y1*scale);
+    drawGlyph(canvas,r.g);
 
-      const path=r.g.getPath(x,y,fontSize);
-      path.fill="#111111";
-      path.draw(ctx);
-    }catch(err){
-      console.warn("Glyph preview failed:",r.gid,err);
-    }
-    const gid=document.createElement("span");gid.className="gid";gid.textContent="#"+r.gid;
-    const u=document.createElement("span");u.className="uni";u.textContent=uni?"U+"+uni:"—";
-    card.append(c,gid,u);
-    card.title=`Glyph ${r.gid}${uni?" · U+"+uni:""}`;
-    card.onclick=()=>{removed.has(r.gid)?removed.delete(r.gid):removed.add(r.gid);render()};
-    grid.appendChild(card);shown++;
+    const gid=document.createElement("span");
+    gid.className="gid";
+    gid.textContent="#"+r.gid;
+
+    const u=document.createElement("span");
+    u.className="uni";
+    u.textContent=uni?"U+"+uni:"—";
+
+    card.append(canvas,gid,u);
+
+    card.title=
+      `Glyph ${r.gid}`+
+      (uni?" · U+"+uni:"");
+
+    card.onclick=()=>{
+      if(removed.has(r.gid))
+        removed.delete(r.gid);
+      else
+        removed.add(r.gid);
+
+      updateStatusOnly();
+      card.classList.toggle("selected",removed.has(r.gid));
+    };
+
+    grid.appendChild(card);
+    shown++;
   }
-  $("status").textContent=`Total: ${records.length} · Selected for removal: ${removed.size} · Showing: ${shown}`;
+
+  $("status").textContent=
+    `Total: ${records.length} · Selected: ${removed.size} · Showing: ${shown}`;
+}
+
+function updateStatusOnly(){
+  $("status").textContent=
+    `Total: ${records.length} · Selected: ${removed.size} · Showing: ${grid.children.length}`;
+}
+
+/*
+  Preview renderer:
+  - Uses the glyph's real outline bounding box.
+  - Adds equal padding.
+  - Uses high-resolution canvas internally.
+  - Centers the outline mathematically.
+  This prevents the old fixed-size 28/38px rendering bug.
+*/
+function drawGlyph(canvas,g){
+  const ctx=canvas.getContext("2d");
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  try{
+    const box=g.getBoundingBox();
+
+    let bw=box.x2-box.x1;
+    let bh=box.y2-box.y1;
+
+    if(!isFinite(bw)||bw<=0) bw=(font.unitsPerEm||1000)*.5;
+    if(!isFinite(bh)||bh<=0) bh=(font.unitsPerEm||1000);
+
+    const pad=22;
+    const usable=canvas.width-(pad*2);
+
+    /*
+      Limit the scale so extreme decorative glyphs do not become
+      enormous compared with normal glyphs.
+    */
+    const visualScale=Math.min(
+      usable/bw,
+      usable/bh
+    );
+
+    const em=font.unitsPerEm||1000;
+    const size=em*visualScale;
+
+    const bx=(box.x1+box.x2)/2;
+    const by=(box.y1+box.y2)/2;
+
+    const x=(canvas.width/2)-(bx*visualScale);
+    const y=(canvas.height/2)+(by*visualScale);
+
+    const path=g.getPath(x,y,size);
+    path.fill="#111111";
+    path.draw(ctx);
+
+  }catch(err){
+    ctx.fillStyle="#888";
+    ctx.font="24px Arial";
+    ctx.textAlign="center";
+    ctx.fillText("?",canvas.width/2,canvas.height/2);
+  }
+}
+
+function setEngine(text,cls){
+  const e=$("engineStatus");
+  e.textContent=text;
+  e.className="engine "+cls;
+}
+
+async function ensureEngine(){
+
+  if(engineReady) return;
+
+  if(enginePromise) return enginePromise;
+
+  enginePromise=(async()=>{
+
+    setEngine("Loading font engine…","busy");
+
+    pyodide=await loadPyodide({
+      indexURL:"https://cdn.jsdelivr.net/pyodide/v0.29.3/full/"
+    });
+
+    setEngine("Installing fontTools…","busy");
+
+    await pyodide.loadPackage("micropip");
+
+    await pyodide.runPythonAsync(`
+import micropip
+await micropip.install("fonttools")
+`);
+
+    await pyodide.runPythonAsync(`
+from fontTools.ttLib import TTFont
+from fontTools import subset
+`);
+
+    engineReady=true;
+    setEngine("Font engine ready","ready");
+
+  })().catch(err=>{
+    console.error(err);
+    setEngine("Engine failed","error");
+    throw err;
+  });
+
+  return enginePromise;
 }
 
 async function downloadFont(){
-  if(!ready||!file||!font){alert("Font engine এখনো প্রস্তুত নয়।");return}
-  if(!removed.size){alert("অন্তত একটি glyph select করুন।");return}
-  if(removed.has(0)){alert("Glyph #0 (.notdef) সরানো যাবে না।");return}
-  if(removed.size>=records.length){alert("অন্তত একটি glyph রাখতে হবে।");return}
 
-  const keep=records.filter(r=>!removed.has(r.gid)).map(r=>r.gid);
-  const bytes=new Uint8Array(await file.arrayBuffer());
-  $("progress").classList.remove("hidden");$("progress").firstElementChild.style.width="20%";
+  if(!file||!font) return;
+
+  if(!removed.size){
+    alert("অন্তত একটি glyph select করুন।");
+    return;
+  }
+
+  if(removed.has(0)){
+    alert("Glyph #0 (.notdef) remove করা যাবে না।");
+    return;
+  }
+
+  if(removed.size>=records.length){
+    alert("অন্তত একটি glyph রাখতে হবে।");
+    return;
+  }
+
   $("downloadBtn").disabled=true;
+  $("progressWrap").classList.remove("hidden");
+  $("progressBar").style.width="5%";
 
   try{
+
+    await ensureEngine();
+
+    $("progressBar").style.width="28%";
+
+    const keep=
+      records
+      .filter(r=>!removed.has(r.gid))
+      .map(r=>r.gid);
+
+    const bytes=
+      new Uint8Array(
+        await file.arrayBuffer()
+      );
+
     pyodide.globals.set("font_bytes",bytes);
-    pyodide.globals.set("keep_json",JSON.stringify(keep));
-    $("progress").firstElementChild.style.width="45%";
-    const result=await pyodide.runPythonAsync(`
-import json, io
+    pyodide.globals.set(
+      "keep_json",
+      JSON.stringify(keep)
+    );
+
+    $("progressBar").style.width="45%";
+
+    const result=
+      await pyodide.runPythonAsync(`
+import io, json
 from fontTools.ttLib import TTFont
 from fontTools import subset
 
-keep = json.loads(keep_json)
-inp = io.BytesIO(bytes(font_bytes))
-font = TTFont(inp, recalcBBoxes=False, recalcTimestamp=False)
+keep=json.loads(keep_json)
 
-options = subset.Options()
-options.layout_features = ["*"]
-options.name_IDs = ["*"]
-options.name_languages = ["*"]
-options.glyph_names = True
-options.hinting = True
-options.retain_gids = False
-options.notdef_glyph = True
-options.recommended_glyphs = True
-options.desubroutinize = False
+font=TTFont(
+    io.BytesIO(bytes(font_bytes)),
+    recalcBBoxes=False,
+    recalcTimestamp=False
+)
 
-subsetter = subset.Subsetter(options=options)
-subsetter.populate(gids=keep)
-subsetter.subset(font)
+opt=subset.Options()
 
-out = io.BytesIO()
-font.save(out, reorderTables=False)
+opt.layout_features=["*"]
+opt.name_IDs=["*"]
+opt.name_languages=["*"]
+
+opt.glyph_names=True
+opt.hinting=True
+opt.retain_gids=False
+opt.notdef_glyph=True
+opt.recommended_glyphs=True
+opt.desubroutinize=False
+opt.recalc_average_width=True
+opt.recalc_timestamp=False
+
+sub=subset.Subsetter(options=opt)
+sub.populate(gids=keep)
+sub.subset(font)
+
+out=io.BytesIO()
+font.save(out,reorderTables=False)
+
 out.getvalue()
 `);
-    $("progress").firstElementChild.style.width="85%";
-    const out=new Uint8Array(result.toJs({create_memoryview:false}));
+
+    $("progressBar").style.width="88%";
+
+    const out=
+      new Uint8Array(
+        result.toJs({
+          create_memoryview:false
+        })
+      );
+
     result.destroy();
-    const ext=file.name.toLowerCase().endsWith(".otf")?".otf":".ttf";
-    const base=file.name.replace(/\.(ttf|otf)$/i,"");
-    const safe=base.replace(/[\\/:*?"<>|]+/g,"_");
-    const name=`PBFF_${safe}_Removed${ext}`;
-    const blob=new Blob([out],{type:"font/ttf"});
-    const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(a.href),3000);
-    $("progress").firstElementChild.style.width="100%";
-  }catch(e){
-    console.error(e);
-    alert("Font processing failed:\n\n"+(e.message||e));
+
+    const ext=
+      file.name.toLowerCase().endsWith(".otf")
+      ?".otf"
+      :".ttf";
+
+    const base=
+      file.name
+      .replace(/\.(ttf|otf)$/i,"")
+      .replace(/[\\/:*?"<>|]+/g,"_");
+
+    const downloadName=
+      `PBFF_${base}_Removed${ext}`;
+
+    const blob=
+      new Blob(
+        [out],
+        {type:"font/"+ext.slice(1)}
+      );
+
+    const url=
+      URL.createObjectURL(blob);
+
+    const a=document.createElement("a");
+    a.href=url;
+    a.download=downloadName;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(
+      ()=>URL.revokeObjectURL(url),
+      5000
+    );
+
+    $("progressBar").style.width="100%";
+    setEngine("Font ready","ready");
+
+  }catch(err){
+
+    console.error(err);
+
+    alert(
+      "Font processing failed:\\n\\n"+
+      (err.message||err)
+    );
+
+    setEngine("Engine error","error");
+
   }finally{
+
     $("downloadBtn").disabled=false;
-    setTimeout(()=>$("progress").classList.add("hidden"),700);
+
+    setTimeout(()=>{
+      $("progressWrap").classList.add("hidden");
+      $("progressBar").style.width="0";
+    },900);
   }
 }
