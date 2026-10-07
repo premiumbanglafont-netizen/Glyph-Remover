@@ -1,4 +1,4 @@
-# PBFF Glyph Remover FIX 2
+# PBFF Glyph Remover
 
 This build fixes the main reason some selected glyphs were coming back after download.
 
