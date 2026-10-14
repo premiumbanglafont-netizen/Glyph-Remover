@@ -1,31 +1,432 @@
-<!doctype html><html lang="bn"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>PBFF Glyph Remover</title><link rel="icon" href="logo.png"><link rel="stylesheet" href="style.css">
-<script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
-<script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
-</head><body>
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PBFF Glyph Remover</title>
+  <!-- GitHub-এর জন্য সঠিক ফোল্ডার পাথ সহ লোগো লিংক -->
+  <link rel="icon" href="./logo.png">
+  
+  <!-- CDN Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.29.3/full/pyodide.js"></script>
+
+  <!-- Combined CSS Styles -->
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #eef1f5;
+      color: #1c1e21;
+      font: 15px Arial, "Noto Sans Bengali", sans-serif;
+    }
+    .app {
+      max-width: 1100px;
+      margin: 8px auto;
+      background: #fff;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 5px 28px #0001;
+    }
+
+    header {
+      height: 76px;
+      background: #1877f2;
+      color: #fff;
+      padding: 12px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #fff;
+      overflow: hidden;
+    }
+    .logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+    .brand b {
+      display: block;
+      font-size: 21px;
+    }
+    .brand small {
+      font-size: 12px;
+      opacity: .9;
+    }
+    header > span {
+      font-weight: bold;
+      background: #ffffff22;
+      padding: 8px 11px;
+      border-radius: 8px;
+    }
+
+    /* Top Navigation Bar for Page Links */
+    .nav-bar {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 15px;
+      margin-bottom: 12px;
+      padding: 0 10px;
+      flex-wrap: wrap;
+    }
+
+    .nav-link {
+      color: var(--blue-dark, #1877f2);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all 0.2s ease-in-out;
+      background: rgba(255, 255, 255, 0.7);
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid #dce4ec;
+      display: inline-block;
+    }
+
+    /* Hover Effect */
+    .nav-link:hover {
+      background: #1877f2;
+      color: #ffffff;
+      border-color: #1877f2;
+    }
+
+    main {
+      padding: 20px;
+    }
+    .upload {
+      padding: 42px 18px;
+      text-align: center;
+      border: 2px dashed #b9c9e4;
+      background: #f8fbff;
+      border-radius: 14px;
+    }
+    .up {
+      margin: auto auto 12px;
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      background: #e7f0ff;
+      color: #1877f2;
+      font-size: 32px;
+      font-weight: bold;
+    }
+    .upload h2 {
+      margin: 0 0 6px;
+    }
+    .upload p {
+      color: #65676b;
+      margin: 0 0 18px;
+    }
+    input[type=file] {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 11px 18px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    button, #download {
+      background: #1877f2;
+      color: white;
+    }
+    button:disabled {
+      background: #aac5e8;
+      color: white;
+      cursor: not-allowed;
+    }
+
+    .upload small {
+      display: block;
+      margin-top: 12px;
+      color: #65676b;
+    }
+    .hide {
+      display: none;
+    }
+    .fh {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .fh h2 {
+      margin: 4px 0;
+    }
+    .fh small {
+      color: #65676b;
+    }
+    .fh em {
+      background: #f0f2f5;
+      padding: 8px 10px;
+      border-radius: 8px;
+      font-style: normal;
+      font-size: 12px;
+    }
+
+    .note {
+      margin: 14px 0;
+      padding: 11px 13px;
+      background: #fff8e1;
+      border: 1px solid #ffe082;
+      border-radius: 9px;
+      font-size: 12px;
+      line-height: 1.6;
+      color: #705b00;
+    }
+    .bar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .bar strong {
+      margin-right: auto;
+      font-size: 13px;
+    }
+    .bar input {
+      width: 220px;
+      padding: 10px 12px;
+      border: 1px solid #ccd0d5;
+      border-radius: 8px;
+    }
+    .bar button:first-of-type {
+      background: #e4e6eb;
+      color: #222;
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+      gap: 8px;
+      max-height: 580px;
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: #f8f9fa;
+    }
+    .card {
+      height: 108px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 9px;
+      position: relative;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .card.sel {
+      background: #fff0f0;
+      border-color: #fa383e;
+      opacity: .58;
+    }
+    .card.sel:after {
+      content: "×";
+      position: absolute;
+      right: 6px;
+      top: 0;
+      color: #fa383e;
+      font-size: 21px;
+      font-weight: bold;
+    }
+    .card.lock {
+      cursor: not-allowed;
+      background: #f7f7f7;
+    }
+    .cv {
+      width: 86px;
+      height: 86px;
+    }
+    .gid, .uni {
+      position: absolute;
+      bottom: 3px;
+      font-size: 9px;
+      color: #777;
+    }
+    .gid {
+      left: 5px;
+    }
+    .uni {
+      right: 5px;
+      font-size: 8px;
+    }
+
+    #prog {
+      height: 6px;
+      background: #e4e6eb;
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 10px 0;
+    }
+    #pb {
+      display: block;
+      height: 100%;
+      width: 0;
+      background: #1877f2;
+    }
+
+    /* Footer Center Alignment Styling */
+    footer {
+      text-align: center;
+      color: #7a8792;
+      font-size: 13px;
+      padding: 15px 8px 5px 8px;
+      border-top: 1px solid #eee;
+    }
+
+    .footer-links {
+      text-align: center;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a:not(:last-child)::after {
+      content: "·";
+      margin-left: 10px;
+      color: #7a8792;
+    }
+
+    .footer-links a {
+      color: var(--blue, #1877f2);
+      text-decoration: none;
+      font-weight: 600;
+      transition: color 0.2s;
+    }
+
+    .footer-links a:hover {
+      color: #0b4da1;
+      text-decoration: underline;
+    }
+
+    .spinner {
+      display: inline-block;
+      width: 17px;
+      height: 17px;
+      border: 2px solid rgba(255, 255, 255, .4);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: -3px;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media(max-width: 650px) {
+      main { padding: 12px; }
+      .app { width: calc(100% - 8px); }
+      header { padding: 10px 12px; }
+      .logo { width: 46px; height: 46px; }
+      .brand b { font-size: 18px; }
+      header > span { display: none; }
+      .fh { align-items: flex-start; flex-direction: column; }
+      .bar strong { width: 100%; }
+      .bar input { width: 100%; }
+      .bar button { flex: 1; }
+      #grid { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); max-height: 520px; }
+      .card { height: 90px; }
+      .cv { width: 72px; height: 72px; }
+    }
+  </style>
+</head>
+<body>
   <div class="app">
-     <!-- Custom Page Links -->
-  <nav class="nav-bar">
-    <a href="https://premiumbanglafont-netizen.github.io/Font-Preview/" class="nav-link" target="_blank">Font Preview</a>
-    <a href="https://premiumbanglafont-netizen.github.io/font-metadata-editor/" class="nav-link" target="_blank">Font Metadata Editor</a>
-    <a href="https://premiumbanglafont-netizen.github.io/Font-Merger/" class="nav-link" target="_blank">Font Merger</a>
-     <a href="https://premiumbanglafont-netizen.github.io/Font-Format-Converter/" class="nav-link" target="_blank">Font Format Converter</a>
-    <a href="https://premiumbanglafont-netizen.github.io/Glyph-Remover/" class="nav-link" target="_blank">Glyph Remover</a>
-  </nav>
-<header><div class="brand"><div class="logo"><img src="logo.png" alt="PBFF"></div><div><b>PBFF Glyph Remover</b><small>Bangla Font & Font Tools</small></div></div><span>PBFF</span></header>
-<main><section class="upload" id="dropZone"><div class="up">↑</div><h2>Upload TTF / OTF Font</h2><p>Choose a font or drag it here</p><input id="fileInput" type="file" accept=".ttf,.otf"><button id="chooseBtn">Choose Font</button><small id="fileInfo">Maximum 30 MB</small></section>
-<section id="editor" class="hide"><div class="fh"><div><h2 id="fontName">Font</h2><small id="fontMeta"></small></div><em id="engine">Ready</em></div>
-<div class="note"><b>Bangla-safe:</b> Download-এর সময় GSUB/GPOS/GDEF layout data ধরে রেখে fontTools subset করা হবে।</div>
-<div class="bar"><strong id="status">0 glyphs</strong><input id="search" placeholder="Search Glyph ID / Unicode"><button id="reset">Reset</button><button id="download" disabled>Download Font</button></div>
-<div id="prog" class="hide"><i id="pb"></i></div><div id="grid"></div></section></main>
-<footer> PBFF • Glyph Remover • আপনার ব্রাউজারে স্থায়ী ভাবে চলে</footer>
-<div class="footer-links">
-     <a href="https://premiumbanglafont.blogspot.com" target="_blank">Home</a>
-     <a href="https://premiumbanglafont.blogspot.com/p/about.html" target="_blank">About</a>
-     <a href="https://premiumbanglafont.blogspot.com/p/contact-us.html" target="_blank">Contact Us</a>
-     <a href="https://premiumbanglafont.blogspot.com/p/privacy-policy.html" target="_blank">Privacy Policy</a>
-     <a href="https://premiumbanglafont.blogspot.com/p/eula.html" target="_blank">Eula</a>
-     <a href="https://premiumbanglafont.blogspot.com/p/sitemap.html" target="_blank">Sitemap</a>
-</div>
-<script src="app.js"></script></body></html>
+    <!-- Custom Page Links -->
+    <nav class="nav-bar">
+      <a href="https://premiumbanglafont-netizen.github.io/Font-Preview/" class="nav-link" target="_blank">Font Preview</a>
+      <a href="https://premiumbanglafont-netizen.github.io/font-metadata-editor/" class="nav-link" target="_blank">Font Metadata Editor</a>
+      <a href="https://premiumbanglafont-netizen.github.io/Font-Merger/" class="nav-link" target="_blank">Font Merger</a>
+      <a href="https://premiumbanglafont-netizen.github.io/Font-Format-Converter/" class="nav-link" target="_blank">Font Format Converter</a>
+      <a href="https://premiumbanglafont-netizen.github.io/Glyph-Remover/" class="nav-link" target="_blank">Glyph Remover</a>
+    </nav>
+
+    <header>
+      <div class="brand">
+        <!-- লোগো ফাইলের সঠিক লিংক -->
+        <div class="logo"><img src="./logo.png" alt="PBFF"></div>
+        <div><b>PBFF Glyph Remover</b><small>Bangla Font & Font Tools</small></div>
+      </div>
+      <span>PBFF</span>
+    </header>
+
+    <main>
+      <section class="upload" id="dropZone">
+        <div class="up">↑</div>
+        <h2>Upload TTF / OTF Font</h2>
+        <p>Choose a font or drag it here</p>
+        <input id="fileInput" type="file" accept=".ttf,.otf">
+        <button id="chooseBtn">Choose Font</button>
+        <small id="fileInfo">Maximum 30 MB</small>
+      </section>
+
+      <section id="editor" class="hide">
+        <div class="fh">
+          <div>
+            <h2 id="fontName">Font</h2>
+            <small id="fontMeta"></small>
+          </div>
+          <em id="engine">Ready</em>
+        </div>
+
+        <div class="note">
+          <b>Bangla-safe:</b> Download-এর সময় GSUB/GPOS/GDEF layout data ধরে রেখে fontTools subset করা হবে।
+        </div>
+
+        <div class="bar">
+          <strong id="status">0 glyphs</strong>
+          <input id="search" placeholder="Search Glyph ID / Unicode">
+          <button id="reset">Reset</button>
+          <button id="download" disabled>Download Font</button>
+        </div>
+
+        <div id="prog" class="hide"><i id="pb"></i></div>
+        <div id="grid"></div>
+      </section>
+    </main>
+
+    <footer>PBFF • Glyph Remover • আপনার ব্রাউজারে স্থায়ী ভাবে চলে</footer>
+
+    <div class="footer-links">
+      <a href="https://premiumbanglafont.blogspot.com" target="_blank">Home</a>
+      <a href="https://premiumbanglafont.blogspot.com/p/about.html" target="_blank">About</a>
+      <a href="https://premiumbanglafont.blogspot.com/p/contact-us.html" target="_blank">Contact Us</a>
+      <a href="https://premiumbanglafont.blogspot.com/p/privacy-policy.html" target="_blank">Privacy Policy</a>
+      <a href="https://premiumbanglafont.blogspot.com/p/eula.html" target="_blank">Eula</a>
+      <a href="https://premiumbanglafont.blogspot.com/p/sitemap.html" target="_blank">Sitemap</a>
+    </div>
+  </div>
+
+  <!-- JavaScript ফাইলের সঠিক লিংক -->
+  <script src="./app.js"></script>
+</body>
+</html>
